@@ -10,7 +10,6 @@ import java.util.UUID;
 @Entity
 @Table(name = "orders")
 public class Order {
-
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID orderId;
@@ -29,17 +28,23 @@ public class Order {
     @Column(unique = true, nullable = false, length = 4)
     private String pin;
 
+    @Column(unique = true)
+    private String pickupOrderNumber;
+
     @Column(nullable = false)
     private LocalDateTime arrivalTime;
 
     @Column(nullable = false)
     private LocalDateTime kitchenFireTime;
 
+    @Column(nullable = false)
+    private Boolean customCookingTime = false;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private PaymentType paymentType;
 
-    @Column(columnDefinition = "DECIMAL DEFAULT 0")
+    @Column(nullable = false)
     private Double depositAmount = 0.0;
 
     @Column(nullable = false)
@@ -60,4 +65,5 @@ public class Order {
     public enum OrderStatus {
         PENDING, PREPARING, READY, SERVED, CANCELLED, NO_SHOW
     }
+
 }

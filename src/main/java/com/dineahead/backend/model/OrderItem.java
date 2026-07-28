@@ -3,7 +3,7 @@ package com.dineahead.backend.model;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.util.UUID;
-
+import com.fasterxml.jackson.annotation.JsonIgnore;
 @Data
 @Entity
 @Table(name = "order_items")
@@ -15,6 +15,7 @@ public class OrderItem {
 
     @ManyToOne
     @JoinColumn(name = "order_id", nullable = false)
+    @JsonIgnore
     private Order order;
 
     @ManyToOne

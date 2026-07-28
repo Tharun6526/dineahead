@@ -1,7 +1,9 @@
 package com.dineahead.backend.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Data;
+
 import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
@@ -49,5 +51,6 @@ public class Restaurant {
     private Boolean isActive = true;
 
     @OneToMany(mappedBy = "restaurant", cascade = CascadeType.ALL)
+    @JsonIgnore
     private List<MenuItem> menuItems;
 }

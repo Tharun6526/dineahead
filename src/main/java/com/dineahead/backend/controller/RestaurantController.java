@@ -57,14 +57,25 @@ public class RestaurantController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<?> update(@PathVariable UUID id,
-                                    @RequestBody Restaurant restaurant,
-                                    @AuthenticationPrincipal UserDetails userDetails) {
+    public ResponseEntity<?> update(
+            @PathVariable UUID id,
+            @RequestBody Restaurant restaurant,
+            @AuthenticationPrincipal UserDetails userDetails) {
+
         try {
-            return ResponseEntity.ok(ApiResponse.ok("Restaurant updated",
-                    restaurantService.update(id, restaurant, userDetails.getUsername())));
+            return ResponseEntity.ok(
+                    ApiResponse.ok(
+                            "Restaurant updated",
+                            restaurantService.update(
+                                    id,
+                                    restaurant,
+                                    userDetails.getUsername()
+                            )
+                    )
+            );
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
+            return ResponseEntity.badRequest()
+                    .body(ApiResponse.error(e.getMessage()));
         }
     }
 
@@ -107,6 +118,24 @@ public class RestaurantController {
                     restaurantService.toggleMenuItemAvailability(itemId)));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
+        }
+    }
+    @DeleteMapping("/{restaurantId}/menu/{itemId}")
+    public ResponseEntity<?> deleteMenuItem(
+            @PathVariable UUID restaurantId,
+            @PathVariable UUID itemId,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        try {
+            restaurantService.deleteMenuItem(
+                    restaurantId,
+                    itemId,
+                    userDetails.getUsername());
+
+            return ResponseEntity.ok(
+                    ApiResponse.ok("Menu item deleted", null));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest()
+                    .body(ApiResponse.error(e.getMessage()));
         }
     }
 }

@@ -1,5 +1,6 @@
 package com.dineahead.backend.service;
 
+import com.dineahead.backend.dto.ApiResponse;
 import com.dineahead.backend.dto.DelayRequest;
 import com.dineahead.backend.dto.OrderRequest;
 import com.dineahead.backend.dto.PinVerifyRequest;
@@ -23,11 +24,25 @@ public class OrderService {
     @Autowired private NotificationService notificationService;
 
     public Order placeOrder(String userEmail, OrderRequest request) {
+
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
         if (user.getIsBlocked()) {
             throw new RuntimeException("Your account is blocked");
+        }
+
+        // Convert payment type only once
+        Order.PaymentType paymentType =
+                Order.PaymentType.valueOf(request.getPaymentType().toUpperCase());
+
+        // Prevent cash payment after repeated no-shows
+        if (paymentType == Order.PaymentType.CASH
+                && !user.isCashPaymentEnabled()) {
+
+            throw new RuntimeException(
+                    "Cash payment is disabled because of repeated no-shows. Please choose Online Payment."
+            );
         }
 
         Restaurant restaurant = restaurantRepository
@@ -43,6 +58,7 @@ public class OrderService {
         int maxPrepTime = 0;
 
         for (var itemRequest : request.getItems()) {
+
             MenuItem menuItem = menuItemRepository
                     .findById(itemRequest.getItemId())
                     .orElseThrow(() -> new RuntimeException("Menu item not found"));
@@ -55,6 +71,7 @@ public class OrderService {
             orderItem.setMenuItem(menuItem);
             orderItem.setQuantity(itemRequest.getQuantity());
             orderItem.setPriceAtOrder(menuItem.getPrice());
+
             orderItems.add(orderItem);
 
             totalAmount += menuItem.getPrice() * itemRequest.getQuantity();
@@ -64,47 +81,92 @@ public class OrderService {
         Order order = new Order();
         order.setUser(user);
         order.setRestaurant(restaurant);
+        order.setPaymentType(paymentType);
         order.setPin(generateUniquePIN());
+        order.setPickupOrderNumber(generateUniquePickupOrderNumber());
         order.setArrivalTime(request.getArrivalTime());
-        order.setKitchenFireTime(
-                request.getArrivalTime().minusMinutes(maxPrepTime + 2));
-        order.setPaymentType(
-                Order.PaymentType.valueOf(request.getPaymentType().toUpperCase()));
+
+        if (request.getCustomKitchenFireTime() != null) {
+
+            LocalDateTime latestAllowed =
+                    request.getArrivalTime().minusMinutes(maxPrepTime);
+
+            if (request.getCustomKitchenFireTime().isAfter(latestAllowed)) {
+                throw new RuntimeException(
+                        "Cooking start time is too late for the selected items");
+            }
+
+            order.setKitchenFireTime(request.getCustomKitchenFireTime());
+            order.setCustomCookingTime(true);
+
+        } else {
+
+            order.setKitchenFireTime(
+                    request.getArrivalTime().minusMinutes(maxPrepTime + 2));
+
+            order.setCustomCookingTime(false);
+        }
+
         order.setTotalAmount(totalAmount);
         order.setTableNumber(request.getTableNumber());
         order.setStatus(Order.OrderStatus.PENDING);
 
-        if (order.getPaymentType() == Order.PaymentType.CASH) {
+        if (paymentType == Order.PaymentType.CASH) {
             order.setDepositAmount(50.0);
         }
 
-        Order saved = orderRepository.save(order);
-
+        // Link Order and OrderItems (required for CascadeType.ALL)
         for (OrderItem item : orderItems) {
-            item.setOrder(saved);
+            item.setOrder(order);
         }
 
-        notificationService.notifyCustomer(saved,
-                "Order confirmed! Your PIN is: " + saved.getPin());
+        order.setItems(orderItems);
+
+        // Save Order and OrderItems together
+        Order saved = orderRepository.save(order);
+
+        notificationService.notifyCustomer(
+                saved,
+                "Order confirmed!\n" +
+                        "Pickup Order Number: " + saved.getPickupOrderNumber() +
+                        "\nPIN: " + saved.getPin()
+        );
 
         return saved;
     }
 
     public Order verifyPin(PinVerifyRequest request) {
-        Order order = orderRepository.findByPin(request.getPin())
-                .orElseThrow(() -> new RuntimeException("Invalid PIN"));
 
-        if (!order.getRestaurant().getRestaurantId()
-                .equals(request.getRestaurantId())) {
-            throw new RuntimeException("PIN does not belong to this restaurant");
+        Order order = orderRepository
+                .findByRestaurantRestaurantIdAndPickupOrderNumber(
+                request.getRestaurantId(),
+                request.getPickupOrderNumber().trim().toUpperCase()
+        )
+                .orElseThrow(() ->
+                        new RuntimeException("Invalid Pickup Order Number"));
+
+        if (request.getPin() == null || !order.getPin().equals(request.getPin())) {
+            throw new RuntimeException("Invalid PIN");
         }
 
         if (order.getStatus() != Order.OrderStatus.READY) {
-            throw new RuntimeException("Order not ready yet. Status: "
-                    + order.getStatus());
+            throw new RuntimeException(
+                    "Order not ready yet. Status: " + order.getStatus()
+            );
         }
 
         order.setStatus(Order.OrderStatus.SERVED);
+
+        return orderRepository.save(order);
+    }
+    public Order updateStatus(UUID orderId, String status) {
+
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() ->
+                        new RuntimeException("Order not found"));
+
+        order.setStatus(Order.OrderStatus.valueOf(status));
+
         return orderRepository.save(order);
     }
 
@@ -168,4 +230,55 @@ public class OrderService {
                 pin, Order.OrderStatus.SERVED));
         return pin;
     }
+    private String generateUniquePickupOrderNumber() {
+        String orderNumber;
+
+        do {
+            int raw = (int) (Math.random() * 9000) + 1000;
+            orderNumber = "DA-" + raw;
+        } while (orderRepository.existsByPickupOrderNumber(orderNumber));
+
+        return orderNumber;
+    }
+    public ApiResponse markNoShow(UUID orderId) {
+
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new RuntimeException("Order not found"));
+
+        // Validate current status BEFORE changing it
+        if (order.getStatus() == Order.OrderStatus.SERVED) {
+            throw new RuntimeException("Food has already been served");
+        }
+
+        if (order.getStatus() == Order.OrderStatus.CANCELLED) {
+            throw new RuntimeException("Order is already cancelled");
+        }
+
+        if (order.getStatus() == Order.OrderStatus.NO_SHOW) {
+            throw new RuntimeException("Order is already marked as NO_SHOW");
+        }
+
+        if (order.getStatus() != Order.OrderStatus.READY) {
+            throw new RuntimeException("Only READY orders can be marked as NO_SHOW");
+        }
+
+        // Update order
+        order.setStatus(Order.OrderStatus.NO_SHOW);
+
+        // Update customer
+        User user = order.getUser();
+        user.setNoShowCount(user.getNoShowCount() + 1);
+
+        if (user.getNoShowCount() >= 3) {
+            user.setCashPaymentEnabled(false);
+        }
+
+        userRepository.save(user);
+        orderRepository.save(order);
+
+        return new ApiResponse(
+                true,
+                "Order marked as NO_SHOW successfully",
+                null
+        );    }
 }

@@ -4,7 +4,7 @@ import jakarta.persistence.*;
 import lombok.Data;
 import java.time.LocalDateTime;
 import java.util.UUID;
-
+import com.fasterxml.jackson.annotation.JsonIgnore;
 @Data
 @Entity
 @Table(name = "users")
@@ -23,6 +23,7 @@ public class User {
     @Column(unique = true, nullable = false)
     private String phone;
 
+    @JsonIgnore
     @Column(nullable = false)
     private String passwordHash;
 
@@ -43,4 +44,6 @@ public class User {
     public enum UserRole {
         CUSTOMER, RESTAURANT_OWNER, ADMIN
     }
+
+    private boolean cashPaymentEnabled = true;
 }

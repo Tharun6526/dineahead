@@ -42,13 +42,24 @@ public class RestaurantService {
     }
 
     public Restaurant update(UUID id, Restaurant updated, String ownerEmail) {
+
         Restaurant existing = getById(id);
+
         if (!existing.getOwner().getEmail().equals(ownerEmail)) {
             throw new RuntimeException("Unauthorized — not the owner");
         }
-        updated.setRestaurantId(id);
-        updated.setOwner(existing.getOwner());
-        return restaurantRepository.save(updated);
+
+        existing.setName(updated.getName());
+        existing.setAddress(updated.getAddress());
+        existing.setLatitude(updated.getLatitude());
+        existing.setLongitude(updated.getLongitude());
+        existing.setTotalTables(updated.getTotalTables());
+        existing.setOpeningTime(updated.getOpeningTime());
+        existing.setClosingTime(updated.getClosingTime());
+        existing.setCuisineType(updated.getCuisineType());
+        existing.setImageUrl(updated.getImageUrl());
+
+        return restaurantRepository.save(existing);
     }
 
     public List<MenuItem> getMenu(UUID restaurantId) {
@@ -65,15 +76,34 @@ public class RestaurantService {
         return menuItemRepository.save(item);
     }
 
-    public MenuItem updateMenuItem(UUID restaurantId, UUID itemId,
-                                   MenuItem updated, String ownerEmail) {
+    public MenuItem updateMenuItem(UUID restaurantId,
+                                   UUID itemId,
+                                   MenuItem updated,
+                                   String ownerEmail) {
+
         Restaurant restaurant = getById(restaurantId);
+
         if (!restaurant.getOwner().getEmail().equals(ownerEmail)) {
             throw new RuntimeException("Unauthorized");
         }
-        updated.setItemId(itemId);
-        updated.setRestaurant(restaurant);
-        return menuItemRepository.save(updated);
+
+        MenuItem existing = menuItemRepository.findById(itemId)
+                .orElseThrow(() -> new RuntimeException("Menu item not found"));
+
+        if (!existing.getRestaurant().getRestaurantId().equals(restaurantId)) {
+            throw new RuntimeException("Menu item does not belong to this restaurant");
+        }
+
+        existing.setName(updated.getName());
+        existing.setDescription(updated.getDescription());
+        existing.setPrice(updated.getPrice());
+        existing.setPrepTimeMinutes(updated.getPrepTimeMinutes());
+        existing.setCategory(updated.getCategory());
+        existing.setImageUrl(updated.getImageUrl());
+        existing.setIsAvailable(updated.getIsAvailable());
+        existing.setIsVeg(updated.getIsVeg());
+
+        return menuItemRepository.save(existing);
     }
 
     public MenuItem toggleMenuItemAvailability(UUID itemId) {
@@ -81,6 +111,24 @@ public class RestaurantService {
                 .orElseThrow(() -> new RuntimeException("Item not found"));
         item.setIsAvailable(!item.getIsAvailable());
         return menuItemRepository.save(item);
+    }
+
+    public void deleteMenuItem(UUID restaurantId, UUID itemId, String ownerEmail) {
+
+        Restaurant restaurant = getById(restaurantId);
+
+        if (!restaurant.getOwner().getEmail().equals(ownerEmail)) {
+            throw new RuntimeException("Unauthorized");
+        }
+
+        MenuItem item = menuItemRepository.findById(itemId)
+                .orElseThrow(() -> new RuntimeException("Menu item not found"));
+
+        if (!item.getRestaurant().getRestaurantId().equals(restaurantId)) {
+            throw new RuntimeException("Menu item does not belong to this restaurant");
+        }
+
+        menuItemRepository.delete(item);
     }
 }
 

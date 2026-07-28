@@ -7,12 +7,16 @@ import com.dineahead.backend.security.JwtUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-
+import com.dineahead.backend.repository.RestaurantRepository;
+import com.dineahead.backend.model.Restaurant;
+import java.util.UUID;
 @Service
 public class AuthService {
 
     @Autowired private UserRepository userRepository;
     @Autowired private PasswordEncoder passwordEncoder;
+    @Autowired
+    private RestaurantRepository restaurantRepository;
     @Autowired private JwtUtil jwtUtil;
 
     public AuthResponse register(RegisterRequest request) {
@@ -33,7 +37,23 @@ public class AuthService {
         userRepository.save(user);
 
         String token = jwtUtil.generateToken(user.getEmail(), user.getRole().name());
-        return new AuthResponse(token, user.getName(), user.getEmail(), user.getRole().name());
+
+        UUID restaurantId = null;
+
+        if (user.getRole() == User.UserRole.RESTAURANT_OWNER) {
+            restaurantId = restaurantRepository
+                    .findByOwner(user)
+                    .map(Restaurant::getRestaurantId)
+                    .orElse(null);
+        }
+
+        return new AuthResponse(
+                token,
+                user.getName(),
+                user.getEmail(),
+                user.getRole().name(),
+                restaurantId
+        );
     }
 
     public AuthResponse login(LoginRequest request) {
@@ -47,8 +67,23 @@ public class AuthService {
         if (user.getIsBlocked()) {
             throw new RuntimeException("Your account has been blocked due to repeated no-shows");
         }
-
         String token = jwtUtil.generateToken(user.getEmail(), user.getRole().name());
-        return new AuthResponse(token, user.getName(), user.getEmail(), user.getRole().name());
+
+        UUID restaurantId = null;
+
+        if (user.getRole() == User.UserRole.RESTAURANT_OWNER) {
+            restaurantId = restaurantRepository
+                    .findByOwner(user)
+                    .map(Restaurant::getRestaurantId)
+                    .orElse(null);
+        }
+
+        return new AuthResponse(
+                token,
+                user.getName(),
+                user.getEmail(),
+                user.getRole().name(),
+                restaurantId
+        );
     }
 }

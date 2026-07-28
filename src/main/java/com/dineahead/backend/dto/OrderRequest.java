@@ -12,4 +12,6 @@ public class OrderRequest {
     private LocalDateTime arrivalTime;
     private String paymentType;
     private Integer tableNumber;
+    private LocalDateTime customKitchenFireTime;
+
 }

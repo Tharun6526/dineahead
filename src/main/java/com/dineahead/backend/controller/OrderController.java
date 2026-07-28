@@ -29,7 +29,11 @@ public class OrderController {
             Order order = orderService.placeOrder(
                     userDetails.getUsername(), request);
             return ResponseEntity.ok(
-                    ApiResponse.ok("Order placed! PIN: " + order.getPin(), order));
+                    ApiResponse.ok(
+                            "Order placed successfully!",
+                            order
+                    )
+            );
         } catch (Exception e) {
             return ResponseEntity.badRequest()
                     .body(ApiResponse.error(e.getMessage()));
@@ -42,6 +46,22 @@ public class OrderController {
             Order order = orderService.verifyPin(request);
             return ResponseEntity.ok(
                     ApiResponse.ok("Food served successfully!", order));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest()
+                    .body(ApiResponse.error(e.getMessage()));
+        }
+    }
+    @PatchMapping("/{id}/status")
+    public ResponseEntity<?> updateStatus(
+            @PathVariable UUID id,
+            @RequestParam String status) {
+
+        try {
+            Order order = orderService.updateStatus(id, status);
+
+            return ResponseEntity.ok(
+                    ApiResponse.ok("Status updated", order));
+
         } catch (Exception e) {
             return ResponseEntity.badRequest()
                     .body(ApiResponse.error(e.getMessage()));
@@ -89,5 +109,9 @@ public class OrderController {
     public ResponseEntity<?> restaurantOrders(@PathVariable UUID restaurantId) {
         return ResponseEntity.ok(ApiResponse.ok("Orders fetched",
                 orderService.getRestaurantOrders(restaurantId)));
+    }
+    @PatchMapping("/{id}/mark-no-show")
+    public ResponseEntity<?> markNoShow(@PathVariable UUID id){
+        return ResponseEntity.ok(orderService.markNoShow(id));
     }
 }

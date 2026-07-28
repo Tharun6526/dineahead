@@ -13,6 +13,7 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
     Optional<Order> findByPin(String pin);
 
     List<Order> findByUser(User user);
+    List<Order> findByStatus(Order.OrderStatus status);
 
     List<Order> findByRestaurantRestaurantId(UUID restaurantId);
 
@@ -21,4 +22,9 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
     boolean existsByPinAndStatusNot(String pin, Order.OrderStatus status);
 
     List<Order> findByStatusAndArrivalTimeBefore(Order.OrderStatus status, LocalDateTime time);
+boolean existsByPickupOrderNumber(String pickupOrderNumber);
+    Optional<Order> findByRestaurantRestaurantIdAndPickupOrderNumber(
+            UUID restaurantId,
+            String pickupOrderNumber
+    );
 }
